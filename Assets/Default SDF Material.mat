@@ -12,8 +12,6 @@ Material:
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords:
-  - EMBOSS_ON
-  - OUTLINE_ON
   - TEXTURING_OFF
   - UNDERLAY_ON
   m_InvalidKeywords:
@@ -67,6 +65,10 @@ Material:
         m_Offset: {x: 0, y: 0}
     - _MainTex:
         m_Texture: {fileID: 2800000, guid: a8e1700b265188f4ca88ef65ab454a16, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _MaskTex:
+        m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _MetallicGlossMap:
@@ -126,12 +128,13 @@ Material:
     - _DetailNormalMapScale: 1
     - _Diffuse: 0.5
     - _DstBlend: 10
+    - _DynamicOutline: 0
     - _EmbossSoftness: 0.3
     - _EmbossWidth: 0.2
-    - _EnableEmboss: 1
-    - _EnableOutline: 1
+    - _EnableEmboss: 0
+    - _EnableOutline: 0
     - _EnvironmentReflections: 1
-    - _FaceDilate: 0.1
+    - _FaceDilate: 0
     - _FaceUVSpeedX: 0
     - _FaceUVSpeedY: 0
     - _GlossMapScale: 0
@@ -181,6 +184,7 @@ Material:
     - _UnderlayOffsetY: 5
     - _UnderlaySoftness: 0.2
     - _UniformGradient: 0
+    - _UseUIAlphaClip: 0
     - _VertexOffsetX: 0
     - _VertexOffsetY: 0
     - _WeightBold: 0.5

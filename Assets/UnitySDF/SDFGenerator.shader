@@ -31,11 +31,15 @@ Shader "Internal/SDFGenerator" {
                 float2 uv : TEXCOORD0;
             };
 
+
+			CBUFFER_START(UnityPerMaterial)
             sampler2D _MainTex;
             float4 _MainTex_ST;
             float4 _MainTex_TexelSize;
             float _Spread;
             float _Channel;
+            float _Feather;
+            CBUFFER_END
 
             v2f vert (appdata v) {
                 v2f o;
@@ -131,12 +135,15 @@ Shader "Internal/SDFGenerator" {
                 float2 uv : TEXCOORD0;
             };
 
+			CBUFFER_START(UnityPerMaterial)
             sampler2D _SourceTex;
             sampler2D _MainTex;
             float4 _MainTex_ST;
             float4 _MainTex_TexelSize;
-            float _Feather;
+            float _Spread;
             float _Channel;
+            float _Feather;
+            CBUFFER_END
 
             v2f vert(appdata v) {
                 v2f o;
@@ -153,7 +160,7 @@ Shader "Internal/SDFGenerator" {
                 // Get the computed nearest edge
                 float4 edge = sampleEdgeUV(input.uv);
                 // Compute a distance factor based on the smaller edge
-                float2 dstFact = _MainTex_TexelSize.zw / max(_MainTex_TexelSize.z, _MainTex_TexelSize.w);
+                const float2 dstFact = _MainTex_TexelSize.zw / max(_MainTex_TexelSize.z, _MainTex_TexelSize.w);
                 // Compute the distance
                 float dst = length((input.uv - edge.xy) * dstFact);
                 // Compute the SDF from distance (based on 'solid' (in b) and 'feather' distance)

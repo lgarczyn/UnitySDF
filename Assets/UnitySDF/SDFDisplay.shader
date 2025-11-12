@@ -33,18 +33,53 @@ Shader "Sprites/SDFDisplay" {
         _UnderlayDilate("Border Dilate", Range(-1,1)) = 0
         _UnderlaySoftness("Border Softness", Range(0,1)) = 0
 
+        [Header(Loop)]
+        [KeywordEnum(Off, On)] LOOP("Loop", Float) = 0
+        _LoopSpeed("Loop Speed Y", Float) = 1
+        _Margin("Margin", Float) = 0
+        _AspectRatio("AspectRatio", Float) = 0
+        _Samples("Samples", Int) = 1
+
         [Header(Texturing)]
         [KeywordEnum(Off, Face, All)] TEXTURING("Texturing", Float) = 0
 
         [Toggle(UNIFORM_GRADIENT)] _UniformGradient("Force Uniform Gradient", Float) = 0
+
+        _StencilComp ("Stencil Comparison", Float) = 8
+        _Stencil ("Stencil ID", Float) = 0
+        _StencilOp ("Stencil Operation", Float) = 0
+        _StencilWriteMask ("Stencil Write Mask", Float) = 255
+        _StencilReadMask ("Stencil Read Mask", Float) = 255
+
+        _ColorMask ("Color Mask", Float) = 15
+
+        [Toggle(UNITY_UI_ALPHACLIP)] _UseUIAlphaClip ("Use Alpha Clip", Float) = 0
     }
     SubShader {
-        Tags { "RenderType"="Transparent" "Queue"="Transparent" }
+        Tags
+        {
+            "Queue"="Transparent"
+            "IgnoreProjector"="True"
+            "RenderType"="Transparent"
+            "PreviewType"="Plane"
+            "CanUseSpriteAtlas"="True"
+        }
+
+        Stencil
+        {
+            Ref [_Stencil]
+            Comp [_StencilComp]
+            Pass [_StencilOp]
+            ReadMask [_StencilReadMask]
+            WriteMask [_StencilWriteMask]
+        }
 
         Cull Off
         Lighting Off
         ZWrite Off
+      
         ZTest[unity_GUIZTestMode]
+        ColorMask [_ColorMask]
         Blend[_SrcBlend][_DstBlend]
 
         Pass {
@@ -53,12 +88,14 @@ Shader "Sprites/SDFDisplay" {
             #pragma vertex vert
             #pragma fragment frag
 
-            #include "UnityCG.cginc"
+			      #include "UnityCG.cginc"
+			      #include "UnityUI.cginc"
 
             #pragma shader_feature __ OUTLINE_ON
             #pragma shader_feature __ EMBOSS_ON
             #pragma shader_feature UNDERLAY_OFF UNDERLAY_ON UNDERLAY_BEVEL
             #pragma shader_feature TEXTURING_OFF TEXTURING_FACE TEXTURING_ALL
+            #pragma shader_feature LOOP_OFF LOOP_ON
             #pragma shader_feature __ UNIFORM_GRADIENT
             #pragma multi_compile __ UNITY_UI_CLIP_RECT
 
@@ -75,8 +112,11 @@ Shader "Sprites/SDFDisplay" {
 #if UNITY_UI_CLIP_RECT
                 half2 worldPosition : TEXCOORD1;
 #endif
+                float2 suv: TEXCOORD2;
             };
 
+
+CBUFFER_START(UnityPerMaterial)
             sampler2D _MainTex;
             float4 _MainTex_ST;
             float4 _MainTex_TexelSize;
@@ -85,29 +125,38 @@ Shader "Sprites/SDFDisplay" {
             half4 _FaceColor;
             half _FaceDilate;
 
-#if UNITY_UI_CLIP_RECT
-#           include "UnityUI.cginc"
+//#if UNITY_UI_CLIP_RECT
             uniform float4		_ClipRect;	// bottom left(x,y) : top right(z,w)
-#endif
+//#endif
 
-#if defined(EMBOSS_ON)
+//#if defined(EMBOSS_ON)
             half4 _EmbossLight, _EmbossDark;
             half _EmbossSoftness;
             half _EmbossWidth;
-#endif
-#if defined(OUTLINE_ON)
+//#endif
+//#if defined(OUTLINE_ON)
             half4 _OutlineColor;
             half _OutlineSoftness;
             half _OutlineWidth;
-#endif
-#if !defined(UNDERLAY_OFF)
+//#endif
+//#if !defined(UNDERLAY_OFF)
             half4 _UnderlayColor;
             half _UnderlayDilate;
             half _UnderlaySoftness;
-#endif
-#if defined(EMBOSS_ON) || !defined(UNDERLAY_OFF)
+//#endif
+//#if defined(EMBOSS_ON) || !defined(UNDERLAY_OFF)
             half _UnderlayOffsetX;
             half _UnderlayOffsetY;
+//#endif
+//#if defined(LOOP_ON)
+            half _LoopSpeed;
+            half _Margin;
+            half _AspectRatio;
+            int _Samples;
+//#endif
+CBUFFER_END
+
+#if defined(EMBOSS_ON) || !defined(UNDERLAY_OFF)
             half ComputeLit(half d) {
                 bool flipY = false;
 #   if defined(UNITY_UV_STARTS_AT_TOP)
@@ -122,22 +171,42 @@ Shader "Sprites/SDFDisplay" {
 
             v2f vert (appdata v) {
                 v2f o;
+                UNITY_SETUP_INSTANCE_ID(v);
+                UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(OUT);
                 o.vertex = UnityObjectToClipPos(v.vertex);
                 o.uv = TRANSFORM_TEX(v.uv, _MainTex);
                 o.color = v.color;
+                o.suv = v.uv;
 #if UNITY_UI_CLIP_RECT
                 o.worldPosition = v.vertex.xy;
 #endif
                 return o;
             }
 
+            half4 looped(sampler2D tex, float2 uv)
+            {
+#if defined(LOOP_ON)
+                float f = min(uv.y, _AspectRatio - uv.y);
+                f = 1 - saturate(f * _Margin + 0.5 + (1 - _Margin) / 4);
+                uv.y -= _Time.y * _LoopSpeed;
+                half4 c = 0;
+                for (int j = 0; j < _Samples; j++) {
+                    c = max(c, tex2D(tex, uv));
+                    // c *= 0.8;
+                    uv.y += 1. / _Samples;
+                }
+                c -= f;
+                return c;
+#else
+                return tex2D(tex, uv);
+#endif
+            }
+
             half4 frag(v2f i) : SV_Target{
                 half bias = 0.5 - _FaceDilate / 2;
 
-                half4 tex = tex2D(_BackgroundTex, i.uv);
-
                 // Compute density value
-                half d = tex2D(_MainTex, i.uv).a;
+                half d = looped(_MainTex, i.uv).a;
 
                 half fringe = max(fwidth(d), 0.0001);
 #if defined(UNIFORM_GRADIENT)
@@ -148,9 +217,10 @@ Shader "Sprites/SDFDisplay" {
 
                 half4 faceColor = _FaceColor;
                 faceColor.rgb *= i.color.rgb;
-                //faceColor.rgb *= faceColor.a;
+
 
 #if defined(TEXTURING_FACE) || defined(TEXTURING_ALL)
+                half4 tex = looped(_BackgroundTex, i.uv);
                 faceColor *= tex;
 #endif
 
@@ -201,7 +271,7 @@ Shader "Sprites/SDFDisplay" {
                         + ddy(i.uv) * ((flipY ? -1 : 1) * _UnderlayOffsetY);
 
                     float2 underlayUV = i.uv - offset;
-                    half old = tex2D(_MainTex, underlayUV).a;
+                    half old = looped(_MainTex, underlayUV).a;
                     c += _UnderlayColor * _UnderlayColor.a * (1 - c.a) *
                         saturate((old - ul_from) / max(0.0001, ul_to - ul_from));
 #elif defined(UNDERLAY_BEVEL)
@@ -215,9 +285,16 @@ Shader "Sprites/SDFDisplay" {
                 }
 #endif
                 c.a *= i.color.a;
+                // Un pre-multiply alpha to avoid color issues on borders
+                if (c.a > 0.0001)
+                  c.rgb /= c.a;
 
 #if UNITY_UI_CLIP_RECT
                 c *= UnityGet2DClipping(i.worldPosition.xy, _ClipRect);
+#endif
+
+#ifdef UNITY_UI_ALPHACLIP
+                clip (color.a - 0.001);
 #endif
 
                 return c;

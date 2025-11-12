@@ -1,0 +1,9 @@
+﻿{
+  "name": "Assembly-SDF-Editor",
+  "references": [
+    "GUID:771503e4970742fbad48d42c148c0776"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ]
+}
